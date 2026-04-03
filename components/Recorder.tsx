@@ -1,7 +1,16 @@
 import React, { useState, useRef, useEffect } from "react";
 import { RecordingStatus, RecordingMode } from "../types";
-import { Mic, Pause, Play, Square, Loader2, Radio, Zap } from "lucide-react";
+import { Mic, Pause, Play, Square, Loader2, Radio, Zap, ChevronDown } from "lucide-react";
 import LiveTranscriptionView from "./LiveTranscriptionView";
+import {
+  STANDARD_MODELS,
+  LIVE_MODELS,
+  DEFAULT_STANDARD_MODEL,
+  DEFAULT_LIVE_MODEL,
+} from "../constants/geminiModels";
+
+const STORAGE_KEY_STANDARD = "swarolipi_gemini_standard_model";
+const STORAGE_KEY_LIVE = "swarolipi_gemini_live_model";
 
 interface RecorderProps {
   onTranscriptionComplete: (text: string) => void;
@@ -23,7 +32,34 @@ const Recorder: React.FC<RecorderProps> = ({
   const [mode, setMode] = useState<RecordingMode>("standard");
   const [liveText, setLiveText] = useState("");
   const [isLiveConnected, setIsLiveConnected] = useState(false);
+  const [standardModel, setStandardModel] = useState<string>(() => {
+    try {
+      return localStorage.getItem(STORAGE_KEY_STANDARD) || DEFAULT_STANDARD_MODEL;
+    } catch {
+      return DEFAULT_STANDARD_MODEL;
+    }
+  });
+  const [liveModel, setLiveModel] = useState<string>(() => {
+    try {
+      return localStorage.getItem(STORAGE_KEY_LIVE) || DEFAULT_LIVE_MODEL;
+    } catch {
+      return DEFAULT_LIVE_MODEL;
+    }
+  });
   const timerInterval = useRef<number | null>(null);
+
+  const persistStandardModel = (id: string) => {
+    setStandardModel(id);
+    try {
+      localStorage.setItem(STORAGE_KEY_STANDARD, id);
+    } catch {}
+  };
+  const persistLiveModel = (id: string) => {
+    setLiveModel(id);
+    try {
+      localStorage.setItem(STORAGE_KEY_LIVE, id);
+    } catch {}
+  };
 
   useEffect(() => {
     if (status === "recording") {
@@ -61,7 +97,7 @@ const Recorder: React.FC<RecorderProps> = ({
             const { transcribeAudio } = await import(
               "../services/geminiService"
             );
-            const result = await transcribeAudio(base64Audio, mimeType);
+            const result = await transcribeAudio(base64Audio, mimeType, standardModel);
             onTranscriptionComplete(result);
           } catch (err) {
             console.error(err);
@@ -90,8 +126,9 @@ const Recorder: React.FC<RecorderProps> = ({
         "../services/geminiLiveService"
       );
 
-      await startLiveSession({
-        onTranscript: (text, isFinal) => {
+      await startLiveSession(
+        {
+          onTranscript: (text, isFinal) => {
           setLiveText(text);
           if (isFinal) {
             console.log("Final transcript received");
@@ -109,7 +146,9 @@ const Recorder: React.FC<RecorderProps> = ({
             setTimer(0);
           }
         },
-      });
+        },
+        liveModel
+      );
 
       setStatus("recording");
     } catch (err) {
@@ -209,6 +248,38 @@ const Recorder: React.FC<RecorderProps> = ({
           লাইভ
         </button>
       </div>
+
+      {/* Model selector */}
+      {status === "idle" && (
+        <div className="w-full max-w-sm">
+          <label className="block text-xs font-medium text-slate-500 mb-1.5">
+            {mode === "standard" ? "স্ট্যান্ডার্ড মোডের মডেল" : "লাইভ মোডের মডেল"}
+          </label>
+          <div className="relative">
+            <select
+              value={mode === "standard" ? standardModel : liveModel}
+              onChange={(e) =>
+                mode === "standard"
+                  ? persistStandardModel(e.target.value)
+                  : persistLiveModel(e.target.value)
+              }
+              className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-4 pr-10 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
+            >
+              {(mode === "standard" ? STANDARD_MODELS : LIVE_MODELS).map(
+                (m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                )
+              )}
+            </select>
+            <ChevronDown
+              size={18}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Timer */}
       <div className="text-4xl font-mono font-bold text-slate-700">

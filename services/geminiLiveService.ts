@@ -1,7 +1,6 @@
 import { GoogleGenAI, Modality, Session } from "@google/genai";
 import { LiveSessionCallbacks } from "../types";
-
-const MODEL_NAME = "gemini-live-2.5-flash-native-audio";
+import { DEFAULT_LIVE_MODEL } from "../constants/geminiModels";
 
 let currentSession: Session | null = null;
 let audioContext: AudioContext | null = null;
@@ -52,7 +51,8 @@ function resampleTo16kHz(
 }
 
 export async function startLiveSession(
-  callbacks: LiveSessionCallbacks
+  callbacks: LiveSessionCallbacks,
+  modelId?: string
 ): Promise<void> {
   const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -60,6 +60,7 @@ export async function startLiveSession(
   }
 
   const ai = new GoogleGenAI({ apiKey });
+  const model = modelId || DEFAULT_LIVE_MODEL;
 
   let accumulatedText = "";
 
@@ -67,7 +68,7 @@ export async function startLiveSession(
 
   try {
     const session = await ai.live.connect({
-      model: MODEL_NAME,
+      model,
       config: {
         responseModalities: [Modality.TEXT],
         systemInstruction:
@@ -79,7 +80,7 @@ export async function startLiveSession(
           isSessionReady = true;
           callbacks.onConnectionChange(true);
         },
-        onmessage: (event: MessageEvent) => {
+        onmessage: (event: { data?: string | object }) => {
           try {
             const data =
               typeof event.data === "string"

@@ -1,14 +1,17 @@
-
 import { GoogleGenAI } from "@google/genai";
+import { DEFAULT_STANDARD_MODEL } from "../constants/geminiModels";
 
-const MODEL_NAME = 'gemini-3-flash-preview';
-
-export async function transcribeAudio(base64Audio: string, mimeType: string = 'audio/webm'): Promise<string> {
+export async function transcribeAudio(
+  base64Audio: string,
+  mimeType: string = "audio/webm",
+  modelId?: string
+): Promise<string> {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
+  const model = modelId || DEFAULT_STANDARD_MODEL;
+
   try {
     const response = await ai.models.generateContent({
-      model: MODEL_NAME,
+      model,
       contents: {
         parts: [
           {
